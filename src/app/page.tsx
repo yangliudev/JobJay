@@ -22,7 +22,7 @@ export default function Home() {
             How it Works
           </Link>
           <Link
-            href="/login"
+            href="/auth"
             className="text-purple-700 font-semibold hover:underline"
           >
             Log in
