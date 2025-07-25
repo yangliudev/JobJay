@@ -1,18 +1,43 @@
 "use client";
 import { useState } from "react";
-import Link from "next/link";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
-export default function AuthPage() {
-  const [isLogin, setIsLogin] = useState(true);
+export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const router = useRouter();
+
+  const loginUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    const res = await signIn("credentials", {
+      redirect: false,
+      email,
+      password,
+    });
+
+    if (res?.error) {
+      setError("Invalid email or password");
+    } else {
+      router.push("/dashboard"); // change to your post-login route
+    }
+  };
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-purple-50 px-4 py-12">
       <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-md">
         <h2 className="text-2xl font-bold mb-6 text-center text-purple-800">
-          {isLogin ? "Log in to JobJay" : "Create your JobJay account"}
+          Log in to JobJay
         </h2>
 
-        <form className="space-y-5">
+        <form className="space-y-5" onSubmit={loginUser}>
+          {error && (
+            <div className="text-red-600 text-sm text-center">{error}</div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1">
               Email
@@ -21,6 +46,7 @@ export default function AuthPage() {
               type="email"
               required
               className="w-full border border-zinc-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-600"
+              onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
@@ -32,40 +58,17 @@ export default function AuthPage() {
               type="password"
               required
               className="w-full border border-zinc-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-600"
+              onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-
-          {!isLogin && (
-            <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-1">
-                Confirm Password
-              </label>
-              <input
-                type="password"
-                required
-                className="w-full border border-zinc-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-600"
-              />
-            </div>
-          )}
 
           <button
             type="submit"
             className="w-full bg-purple-700 text-white font-medium py-2 rounded-lg hover:bg-purple-800 transition"
           >
-            {isLogin ? "Log In" : "Sign Up"}
+            Log In
           </button>
         </form>
-
-        <p className="mt-6 text-sm text-center text-zinc-600">
-          {isLogin ? "Don’t have an account?" : "Already have an account?"}{" "}
-          <button
-            type="button"
-            onClick={() => setIsLogin(!isLogin)}
-            className="text-purple-700 hover:underline font-medium"
-          >
-            {isLogin ? "Sign up" : "Log in"}
-          </button>
-        </p>
       </div>
     </main>
   );

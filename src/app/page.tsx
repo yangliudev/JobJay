@@ -22,7 +22,7 @@ export default function Home() {
             How it Works
           </Link>
           <Link
-            href="/auth"
+            href="/login"
             className="text-purple-700 font-semibold hover:underline"
           >
             Log in
@@ -107,7 +107,7 @@ export default function Home() {
           </p>
           <p>
             <strong className="text-purple-700">2.</strong> Set how many jobs
-            you'd like to apply to each day.
+            you would like to apply to each day.
           </p>
           <p>
             <strong className="text-purple-700">3.</strong> Track progress, earn
