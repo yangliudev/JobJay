@@ -121,6 +121,14 @@ export default function Dashboard() {
 
   // Handle sign out
   const handleSignOut = async () => {
+    // Clear any user-specific data from localStorage
+    localStorage.removeItem("dailyGoal");
+    localStorage.removeItem("userCareer");
+    localStorage.removeItem("quoteDate");
+    localStorage.removeItem("motivationalQuote");
+    localStorage.removeItem("todayApplications");
+
+    // Sign out via NextAuth
     await signOut({ redirect: false });
     router.push("/login");
   };

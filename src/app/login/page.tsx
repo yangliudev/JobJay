@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { useState, useEffect } from "react";
+import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -10,6 +10,14 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
+  const { data: session, status } = useSession();
+
+  // Redirect to dashboard if user is already logged in
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.push("/dashboard");
+    }
+  }, [status, router]);
 
   const loginUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,12 +28,13 @@ export default function LoginPage() {
         redirect: false,
         email,
         password,
+        callbackUrl: "/dashboard",
       });
 
       if (res?.error) {
         setError("Invalid email or password");
       } else {
-        router.push("/dashboard"); // change to your post-login route
+        router.push("/dashboard");
       }
     } catch (error) {
       console.error("Login error:", error);

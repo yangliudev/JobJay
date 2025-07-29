@@ -51,6 +51,8 @@ const handler = NextAuth({
   ],
   session: {
     strategy: "jwt",
+    // Set max age to 30 days for persistent sessions
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   callbacks: {
     async session({ session, token }) {
