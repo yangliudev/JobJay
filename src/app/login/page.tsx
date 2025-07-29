@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -13,16 +14,21 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
 
-    const res = await signIn("credentials", {
-      redirect: false,
-      email,
-      password,
-    });
+    try {
+      const res = await signIn("credentials", {
+        redirect: false,
+        email,
+        password,
+      });
 
-    if (res?.error) {
-      setError("Invalid email or password");
-    } else {
-      router.push("/dashboard"); // change to your post-login route
+      if (res?.error) {
+        setError("Invalid email or password");
+      } else {
+        router.push("/dashboard"); // change to your post-login route
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      setError("An error occurred during login");
     }
   };
 
@@ -68,6 +74,13 @@ export default function LoginPage() {
           >
             Log In
           </button>
+
+          <div className="mt-4 text-center text-sm text-zinc-600">
+            Don&apos;t have an account?{" "}
+            <Link href="/signup" className="text-purple-700 font-medium hover:underline">
+              Sign up
+            </Link>
+          </div>
         </form>
       </div>
     </main>
