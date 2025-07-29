@@ -1,12 +1,11 @@
 import NextAuth from "next-auth";
 import GitHubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 const handler = NextAuth({
-  adapter: PrismaAdapter(prisma),
+  // Removed adapter since we're using JWT strategy only
   providers: [
     GitHubProvider({
       clientId: process.env.GITHUB_ID!,

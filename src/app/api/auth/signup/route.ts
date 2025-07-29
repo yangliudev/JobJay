@@ -27,21 +27,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // TEMPORARY: Using plaintext password for testing with a known safe value
-    // Skip hashing for now
-    console.log("Password type:", typeof password);
-    console.log("Password length:", password?.length);
+    // Hash the password before storing it
+    const hashedPassword = await hashPassword(password);
 
-    // Use hardcoded test password for debugging
-    const testPassword = "TestPassword123";
-
-    // Create a new user with a hardcoded test password
+    // Create a new user with the hashed password
     const user = await prisma.user.create({
       data: {
         firstName,
         lastName,
         email,
-        password: testPassword, // TEMPORARY: Using hardcoded plaintext password for testing
+        password: hashedPassword, // Store hashed password for security
       },
     });
 
