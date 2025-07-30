@@ -14,7 +14,10 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Get the user from the database
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of day
+
+    // Get user info
     const user = await prisma.user.findUnique({
       where: { id: token.sub },
       select: {
@@ -23,8 +26,11 @@ export async function GET(req: NextRequest) {
         lastName: true,
         email: true,
         career: true,
-        createdAt: true,
-        updatedAt: true,
+        // TODO: Add these fields once Prisma client is updated
+        // dailyGoal: true,
+        // currentStreak: true,
+        // longestStreak: true,
+        // lastActiveDate: true,
       },
     });
 
@@ -32,14 +38,29 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
-    // Return the user information (without the password)
+    // Add default values for now
+    const userWithDefaults = {
+      ...user,
+      dailyGoal: 3,
+      currentStreak: 0,
+      longestStreak: 0,
+      lastActiveDate: null,
+    };
+
+    // Mock today's application data for now
+    const todayApplications = {
+      count: 0,
+      goalMet: false,
+    };
+
     return NextResponse.json({
-      user,
+      user: userWithDefaults,
+      todayApplications,
     });
   } catch (error) {
-    console.error("Error fetching user info:", error);
+    console.error("Error fetching user stats:", error);
     return NextResponse.json(
-      { message: "Something went wrong while fetching user information" },
+      { message: "Something went wrong while fetching user stats" },
       { status: 500 }
     );
   }

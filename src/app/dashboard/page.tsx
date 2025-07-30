@@ -23,6 +23,9 @@ export default function Dashboard() {
   const [dailyGoal, setDailyGoal] = useState(3);
   const [todayApplications, setTodayApplications] = useState(0);
   const [career, setCareer] = useState("");
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [longestStreak, setLongestStreak] = useState(0);
+  const [goalMet, setGoalMet] = useState(false);
   const [quote, setQuote] = useState({
     text: "Success is the sum of small efforts, repeated day in and day out.",
     author: "R. Collier",
@@ -43,6 +46,55 @@ export default function Dashboard() {
   const [showConfirmCurrentPassword, setShowConfirmCurrentPassword] =
     useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+
+  // Get career-specific tips
+  const getCareerTips = (careerField: string) => {
+    const tips = {
+      "Software Development": [
+        "🚀 Showcase your GitHub projects and commit history",
+        "💻 Include technical stack and programming languages you're proficient in",
+        "🔧 Highlight any open-source contributions",
+        "📱 Create a portfolio website to demonstrate your skills",
+        "🧪 Mention experience with testing frameworks and CI/CD",
+      ],
+      Marketing: [
+        "📊 Quantify your campaign results and ROI improvements",
+        "🎯 Highlight experience with various marketing channels",
+        "📈 Include analytics and data-driven decision making",
+        "🎨 Showcase creative campaigns and brand initiatives",
+        "📱 Demonstrate knowledge of digital marketing trends",
+      ],
+      Design: [
+        "🎨 Create a stunning online portfolio showcasing your best work",
+        "📐 Include your design process and problem-solving approach",
+        "🖥️ Show proficiency with design tools (Figma, Adobe Creative Suite)",
+        "📱 Demonstrate responsive and user-centered design thinking",
+        "✨ Highlight collaboration with developers and stakeholders",
+      ],
+      Finance: [
+        "📊 Emphasize your analytical skills and attention to detail",
+        "💼 Include relevant certifications (CFA, CPA, FRM)",
+        "📈 Showcase experience with financial modeling and analysis",
+        "🏦 Highlight knowledge of regulations and compliance",
+        "💰 Quantify cost savings or revenue improvements you've achieved",
+      ],
+      Healthcare: [
+        "🏥 Showcase your certifications and continuing education",
+        "❤️ Emphasize patient care experience and outcomes",
+        "📋 Highlight knowledge of healthcare regulations and protocols",
+        "🤝 Demonstrate teamwork and communication skills",
+        "📊 Include experience with healthcare technology and systems",
+      ],
+      Other: [
+        "🎯 Tailor your applications to highlight relevant transferable skills",
+        "📚 Emphasize your ability to learn quickly and adapt",
+        "🤝 Showcase leadership and project management experience",
+        "📈 Quantify your achievements with specific metrics",
+        "🌟 Highlight unique perspectives and diverse experiences",
+      ],
+    };
+    return tips[careerField as keyof typeof tips] || tips["Other"];
+  };
 
   // Load profile data when session is available
   useEffect(() => {
@@ -67,6 +119,9 @@ export default function Dashboard() {
           setFirstName(data.user.firstName);
           setLastName(data.user.lastName);
           setEmail(data.user.email);
+          if (data.user.career) {
+            setCareer(data.user.career);
+          }
         } catch (error) {
           console.error("Error fetching user data:", error);
         }
@@ -112,28 +167,123 @@ export default function Dashboard() {
 
     fetchQuote();
 
-    // Load career and goal from localStorage
+    // Fetch user stats from API
+    const fetchUserStats = async () => {
+      try {
+        const response = await fetch("/api/user/stats");
+        if (response.ok) {
+          const data = await response.json();
+          setDailyGoal(data.user.dailyGoal);
+          setCurrentStreak(data.user.currentStreak);
+          setLongestStreak(data.user.longestStreak);
+          setTodayApplications(data.todayApplications.count);
+          setGoalMet(data.todayApplications.goalMet);
+          if (data.user.career) {
+            setCareer(data.user.career);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching user stats:", error);
+      }
+    };
+
+    fetchUserStats();
+
+    // Load career and goal from localStorage as fallback
     const savedCareer = localStorage.getItem("userCareer");
     if (savedCareer) setCareer(savedCareer);
 
     const savedGoal = localStorage.getItem("dailyGoal");
     if (savedGoal) setDailyGoal(parseInt(savedGoal, 10));
-
-    const savedApplications = localStorage.getItem(
-      `applications_${new Date().toDateString()}`
-    );
-    if (savedApplications)
-      setTodayApplications(parseInt(savedApplications, 10));
   }, []);
 
   // Handle marking applications as sent
-  const markApplicationSent = () => {
-    const newCount = todayApplications + 1;
-    setTodayApplications(newCount);
-    localStorage.setItem(
-      `applications_${new Date().toDateString()}`,
-      newCount.toString()
-    );
+  const markApplicationSent = async () => {
+    try {
+      const response = await fetch("/api/applications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to mark application");
+      }
+
+      // Update local state
+      setTodayApplications(data.dailyApplication.count);
+      setGoalMet(data.dailyApplication.goalMet);
+      setCurrentStreak(data.streak.current);
+      setLongestStreak(data.streak.longest);
+
+      // Show success notification
+      if (data.streak.updated && data.dailyApplication.goalMet) {
+        setNotification({
+          message: `🎉 Goal reached! Current streak: ${data.streak.current} days`,
+          type: "success",
+        });
+      } else {
+        setNotification({
+          message: "Application marked successfully!",
+          type: "success",
+        });
+      }
+
+      // Auto-hide notification after 3 seconds
+      setTimeout(() => {
+        setNotification(null);
+      }, 3000);
+    } catch (error) {
+      console.error("Error marking application:", error);
+      setNotification({
+        message: "Failed to mark application",
+        type: "error",
+      });
+    }
+  };
+
+  // Handle undoing application
+  const undoApplication = async () => {
+    try {
+      const response = await fetch("/api/applications", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to undo application");
+      }
+
+      // Update local state
+      setTodayApplications(data.dailyApplication.count);
+      setGoalMet(data.dailyApplication.goalMet);
+      setCurrentStreak(data.streak.current);
+      setLongestStreak(data.streak.longest);
+
+      // Show success notification
+      setNotification({
+        message: "Application undone successfully",
+        type: "success",
+      });
+
+      // Auto-hide notification after 3 seconds
+      setTimeout(() => {
+        setNotification(null);
+      }, 3000);
+    } catch (error) {
+      console.error("Error undoing application:", error);
+      setNotification({
+        message: "Failed to undo application",
+        type: "error",
+      });
+    }
   };
 
   // Handle saving daily goal
@@ -144,10 +294,45 @@ export default function Dashboard() {
   };
 
   // Handle saving career choice
-  const saveCareer = (newCareer: string) => {
-    setCareer(newCareer);
-    localStorage.setItem("userCareer", newCareer);
-    setShowCareerModal(false);
+  const saveCareer = async (newCareer: string) => {
+    try {
+      // Save to database via API
+      const response = await fetch("/api/user/career", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          career: newCareer,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save career");
+      }
+
+      // Update local state
+      setCareer(newCareer);
+      localStorage.setItem("userCareer", newCareer);
+      setShowCareerModal(false);
+
+      // Show success notification
+      setNotification({
+        message: `Career path set to ${newCareer}`,
+        type: "success",
+      });
+
+      // Auto-hide notification after 3 seconds
+      setTimeout(() => {
+        setNotification(null);
+      }, 3000);
+    } catch (error) {
+      console.error("Error saving career:", error);
+      setNotification({
+        message: "Failed to save career path",
+        type: "error",
+      });
+    }
   };
 
   // Handle profile update
@@ -418,13 +603,45 @@ export default function Dashboard() {
             <h2 className="text-lg font-semibold text-purple-800 mb-2">
               Your Progress
             </h2>
-            <p className="text-zinc-600 mb-4">
+            <p className="text-zinc-600 mb-3">
               You&apos;ve applied to <strong>{todayApplications} jobs</strong>{" "}
               today.
-              {todayApplications >= dailyGoal
+              {goalMet
                 ? " Great job meeting your goal! 🎉"
                 : " Keep the streak going! 🔥"}
             </p>
+
+            {/* Streak Information */}
+            <div className="flex items-center justify-between bg-purple-50 rounded-lg p-3 mb-3">
+              <div className="flex items-center">
+                <span className="text-2xl mr-2">🔥</span>
+                <div>
+                  <p className="text-sm font-medium text-purple-800">
+                    Current Streak: {currentStreak} days
+                  </p>
+                  <p className="text-xs text-purple-600">
+                    Best: {longestStreak} days
+                  </p>
+                </div>
+              </div>
+              {goalMet && (
+                <div className="flex items-center text-green-600">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5 mr-1"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <span className="text-xs font-medium">Goal Met!</span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Career Card */}
@@ -443,23 +660,40 @@ export default function Dashboard() {
 
             {career ? (
               <div className="text-sm">
-                <p className="font-medium text-purple-800 mb-2">
+                <p className="font-medium text-purple-800 mb-3">
                   Current Field: {career}
                 </p>
-                <p className="text-zinc-600">
-                  {career === "Software Development" &&
-                    "Focus on showcasing your projects and technical skills."}
-                  {career === "Marketing" &&
-                    "Highlight your campaign results and creative portfolio."}
-                  {career === "Design" &&
-                    "Make your application stand out with your best design work."}
-                  {career === "Finance" &&
-                    "Emphasize your analytical skills and attention to detail."}
-                  {career === "Healthcare" &&
-                    "Showcase your certifications and patient care experience."}
-                  {career === "Other" &&
-                    "Tailor your applications to highlight relevant transferable skills."}
-                </p>
+                <div className="bg-purple-50 rounded-lg p-4">
+                  <h4 className="font-medium text-purple-800 mb-2 flex items-center">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4 mr-1"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                      />
+                    </svg>
+                    Tips for {career}
+                  </h4>
+                  <ul className="space-y-1 text-xs text-zinc-700">
+                    {getCareerTips(career)
+                      .slice(0, 3)
+                      .map((tip, index) => (
+                        <li key={index} className="flex items-start">
+                          <span className="mr-2 mt-0.5">
+                            {tip.split(" ")[0]}
+                          </span>
+                          <span>{tip.substring(tip.indexOf(" ") + 1)}</span>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-24">
@@ -538,14 +772,80 @@ export default function Dashboard() {
               {dailyGoal}
             </p>
 
-            <button
-              onClick={markApplicationSent}
-              className="mt-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-lg text-sm transition"
-            >
-              Mark 1 Application Sent
-            </button>
+            <div className="flex space-x-2">
+              <button
+                onClick={markApplicationSent}
+                className="flex-1 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-lg text-sm transition"
+              >
+                Mark 1 Application Sent
+              </button>
+              {todayApplications > 0 && (
+                <button
+                  onClick={undoApplication}
+                  className="px-3 py-2 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 rounded-lg text-sm transition flex items-center"
+                  title="Undo last application"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
         </section>
+
+        {/* Career Tips Section */}
+        {career && (
+          <div className="w-full max-w-2xl mt-8">
+            <div className="bg-white shadow-sm rounded-xl p-6">
+              <div className="flex items-center mb-4">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-6 w-6 mr-2 text-purple-700"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 10V3L4 14h7v7l9-11h-7z"
+                  />
+                </svg>
+                <h2 className="text-lg font-semibold text-purple-800">
+                  Job Search Tips for {career}
+                </h2>
+              </div>
+              <div className="grid gap-3">
+                {getCareerTips(career).map((tip, index) => (
+                  <div
+                    key={index}
+                    className="flex items-start p-3 bg-purple-50 rounded-lg"
+                  >
+                    <span className="text-lg mr-3 flex-shrink-0">
+                      {tip.split(" ")[0]}
+                    </span>
+                    <p className="text-sm text-zinc-700 leading-relaxed">
+                      {tip.substring(tip.indexOf(" ") + 1)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Motivational Quote (Bottom) */}
         <div className="w-full max-w-2xl mt-8">

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(req: NextRequest) {
+export async function PUT(req: NextRequest) {
   try {
     // Get the session token to verify the user
     const token = await getToken({ req });
@@ -14,32 +14,39 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Get the user from the database
-    const user = await prisma.user.findUnique({
+    // Get career data from request body
+    const { career } = await req.json();
+
+    // Basic validation
+    if (!career) {
+      return NextResponse.json(
+        { message: "Career field is required" },
+        { status: 400 }
+      );
+    }
+
+    // Update the user's career in the database
+    const updatedUser = await prisma.user.update({
       where: { id: token.sub },
+      data: { career },
       select: {
         id: true,
         firstName: true,
         lastName: true,
         email: true,
         career: true,
-        createdAt: true,
-        updatedAt: true,
       },
     });
 
-    if (!user) {
-      return NextResponse.json({ message: "User not found" }, { status: 404 });
-    }
-
-    // Return the user information (without the password)
+    // Return the updated user information
     return NextResponse.json({
-      user,
+      message: "Career updated successfully",
+      user: updatedUser,
     });
   } catch (error) {
-    console.error("Error fetching user info:", error);
+    console.error("Career update error:", error);
     return NextResponse.json(
-      { message: "Something went wrong while fetching user information" },
+      { message: "Something went wrong during career update" },
       { status: 500 }
     );
   }

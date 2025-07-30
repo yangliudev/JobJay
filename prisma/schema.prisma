@@ -20,6 +20,31 @@ model User {
   password      String   @db.VarChar(255)
   firstName     String
   lastName      String
+  career        String?
+  dailyGoal     Int      @default(3)
+  currentStreak Int      @default(0)
+  longestStreak Int      @default(0)
+  lastActiveDate DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  
+  // Relation to daily application records
+  dailyApplications DailyApplication[]
+}
+
+// Model to track daily application counts
+model DailyApplication {
+  id            String   @id @default(cuid())
+  userId        String
+  date          DateTime @db.Date
+  count         Int      @default(0)
+  goalMet       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Foreign key relation
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Ensure one record per user per day
+  @@unique([userId, date])
 }
