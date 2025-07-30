@@ -183,15 +183,15 @@ export default function Dashboard() {
       {/* Dashboard Content */}
       <div className="px-6 py-10 flex flex-col items-center flex-grow">
         {/* Header */}
-        <header className="w-full max-w-2xl flex justify-between items-center mb-10">
-          <h1 className="text-2xl font-bold text-purple-800">
+        <div className="w-full max-w-2xl text-center mb-10">
+          <h1 className="text-2xl font-bold text-purple-800 mb-4">
             Welcome back,{" "}
             {session?.user?.firstName ||
               session?.user?.name?.split(" ")[0] ||
               "User"}{" "}
             👋
           </h1>
-        </header>
+        </div>
 
         {/* Main Section */}
         <section className="w-full max-w-2xl grid md:grid-cols-2 gap-6">
@@ -207,11 +207,28 @@ export default function Dashboard() {
                 ? " Great job meeting your goal! 🎉"
                 : " Keep the streak going! 🔥"}
             </p>
+          </div>
 
-            {career && (
-              <div className="mt-4 text-sm bg-purple-50 p-3 rounded-lg">
-                <p className="font-medium text-purple-800">Career: {career}</p>
-                <p className="text-zinc-600 mt-1">
+          {/* Career Card */}
+          <div className="bg-white shadow-sm rounded-xl p-6">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-lg font-semibold text-purple-800">
+                Career Path
+              </h2>
+              <button
+                onClick={() => setShowCareerModal(true)}
+                className="text-xs text-purple-700 hover:underline flex items-center"
+              >
+                {career ? "Change" : "Set Career"}
+              </button>
+            </div>
+
+            {career ? (
+              <div className="text-sm">
+                <p className="font-medium text-purple-800 mb-2">
+                  Current Field: {career}
+                </p>
+                <p className="text-zinc-600">
                   {career === "Software Development" &&
                     "Focus on showcasing your projects and technical skills."}
                   {career === "Marketing" &&
@@ -226,29 +243,32 @@ export default function Dashboard() {
                     "Tailor your applications to highlight relevant transferable skills."}
                 </p>
               </div>
-            )}
-
-            {!career && (
-              <button
-                onClick={() => setShowCareerModal(true)}
-                className="text-sm text-purple-700 hover:underline mt-2 flex items-center"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 mr-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+            ) : (
+              <div className="flex flex-col items-center justify-center h-24">
+                <button
+                  onClick={() => setShowCareerModal(true)}
+                  className="px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-sm transition flex items-center"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                  />
-                </svg>
-                Set your career
-              </button>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4 mr-1"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                    />
+                  </svg>
+                  Set Your Career Field
+                </button>
+                <p className="text-xs text-zinc-500 mt-2">
+                  We&apos;ll provide personalized job search tips
+                </p>
+              </div>
             )}
           </div>
 
@@ -307,8 +327,10 @@ export default function Dashboard() {
               Mark 1 Application Sent
             </button>
           </div>
+        </section>
 
-          {/* Motivation Card */}
+        {/* Motivational Quote (Bottom) */}
+        <div className="w-full max-w-2xl mt-8">
           <div className="bg-white shadow-sm rounded-xl p-6">
             <h2 className="text-lg font-semibold text-purple-800 mb-2">
               Today&apos;s Motivation
@@ -318,7 +340,7 @@ export default function Dashboard() {
               — {quote.author}
             </p>
           </div>
-        </section>
+        </div>
 
         {/* Profile Modal */}
         {showProfileModal && (
@@ -455,12 +477,13 @@ export default function Dashboard() {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
               <h3 className="text-xl font-bold text-purple-800 mb-6">
-                Select Your Career
+                Your Career Path
               </h3>
 
               <p className="text-zinc-600 mb-6">
                 What career field are you in? We&apos;ll provide tailored tips
-                for your job search.
+                and resources to help you optimize your job search in this
+                specific industry.
               </p>
 
               <div className="space-y-3 mb-6">
@@ -486,12 +509,24 @@ export default function Dashboard() {
                 ))}
               </div>
 
+              <div className="bg-purple-50 p-4 rounded-lg mb-6">
+                <h4 className="font-medium text-purple-800 mb-2">
+                  Why this matters
+                </h4>
+                <p className="text-sm text-zinc-600">
+                  Different industries have different expectations for resumes,
+                  portfolios, and interview processes. By telling us your field,
+                  we can provide more relevant advice to help you stand out to
+                  recruiters.
+                </p>
+              </div>
+
               <div className="flex justify-end">
                 <button
                   onClick={() => setShowCareerModal(false)}
                   className="px-4 py-2 border border-zinc-300 text-zinc-700 rounded-lg text-sm hover:bg-zinc-50"
                 >
-                  Cancel
+                  Close
                 </button>
               </div>
             </div>
