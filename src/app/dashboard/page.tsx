@@ -6,12 +6,18 @@ import Link from "next/link";
 
 export default function Dashboard() {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
 
   // State for modals
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [showCareerModal, setShowCareerModal] = useState(false);
+  
+  // State for notifications
+  const [notification, setNotification] = useState<{
+    message: string;
+    type: 'success' | 'error';
+  } | null>(null);
 
   // State for user data
   const [dailyGoal, setDailyGoal] = useState(3);
@@ -114,9 +120,81 @@ export default function Dashboard() {
   // Handle profile update
   const updateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Here you would make an API call to update the user profile
-    // For now we'll just close the modal
-    setShowProfileModal(false);
+    
+    // Validation
+    if (!firstName || !lastName || !email) {
+      setNotification({
+        message: 'First name, last name, and email are required',
+        type: 'error'
+      });
+      return;
+    }
+    
+    // Password validation - check if both fields match
+    if (password && password !== confirmPassword) {
+      setNotification({
+        message: 'Passwords do not match',
+        type: 'error'
+      });
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          email,
+          password: password || undefined // Only send password if it's not empty
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to update profile');
+      }
+      
+      // Close the modal
+      setShowProfileModal(false);
+      
+      // Reset password fields
+      setPassword('');
+      setConfirmPassword('');
+      
+      // Force a session refresh to update the UI with new user data
+      await update({
+        name: `${firstName} ${lastName}`,
+        firstName,
+        lastName,
+        email,
+      });
+      
+      // Show success notification
+      setNotification({
+        message: 'Profile updated successfully',
+        type: 'success'
+      });
+      
+      // Auto-hide notification after 3 seconds
+      setTimeout(() => {
+        setNotification(null);
+      }, 3000);
+      
+      // Refresh the page to ensure all components update with new data
+      router.refresh();
+      
+    } catch (error: unknown) {
+      console.error('Error updating profile:', error);
+      setNotification({
+        message: error instanceof Error ? error.message : 'Failed to update profile',
+        type: 'error'
+      });
+    }
   };
 
   // Handle sign out
@@ -144,6 +222,30 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-purple-50 text-zinc-800 flex flex-col">
+      {/* Notification */}
+      {notification && (
+        <div 
+          className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg transition-all duration-300 ease-in-out ${
+            notification.type === 'success' 
+              ? 'bg-green-100 text-green-800 border-l-4 border-green-500' 
+              : 'bg-red-100 text-red-800 border-l-4 border-red-500'
+          }`}
+        >
+          <div className="flex items-center">
+            {notification.type === 'success' ? (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            )}
+            <p>{notification.message}</p>
+          </div>
+        </div>
+      )}
+      
       {/* Top Navbar */}
       <nav className="px-6 py-4 bg-white border-b border-purple-100 flex justify-between items-center">
         <Link
