@@ -24,3 +24,31 @@ body {
   color: var(--foreground);
   /* font-family: Arial, Helvetica, sans-serif; */
 }
+
+/* Animation for section highlighting */
+@keyframes highlight-pulse {
+  0% {
+    background-color: rgba(139, 92, 246, 0);
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0);
+  }
+  50% {
+    background-color: rgba(139, 92, 246, 0.1);
+    box-shadow: 0 0 15px 5px rgba(139, 92, 246, 0.2);
+  }
+  100% {
+    background-color: rgba(139, 92, 246, 0);
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0);
+  }
+}
+
+.highlight-section {
+  animation: highlight-pulse 1.5s ease-in-out;
+  border-radius: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Add smooth scrolling to the entire page */
+html {
+  scroll-behavior: smooth;
+}

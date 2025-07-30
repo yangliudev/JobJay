@@ -14,6 +14,24 @@ export default function Home() {
       router.push("/dashboard");
     }
   }, [status, router]);
+
+  // Smooth scroll function for navigation
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      // Scroll to the element with a smooth behavior
+      element.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+
+      // Highlight the section briefly to draw attention
+      element.classList.add("highlight-section");
+      setTimeout(() => {
+        element.classList.remove("highlight-section");
+      }, 1500);
+    }
+  };
   return (
     <main className="min-h-screen bg-white text-zinc-900 flex flex-col font-sans">
       {/* Header */}
@@ -22,18 +40,18 @@ export default function Home() {
           JobJay
         </h1>
         <nav className="space-x-4 text-sm">
-          <Link
-            href="#features"
-            className="text-zinc-600 hover:text-purple-600 transition"
+          <button
+            onClick={() => scrollToSection("features")}
+            className="text-zinc-600 hover:text-purple-600 transition cursor-pointer"
           >
             Features
-          </Link>
-          <Link
-            href="#how-it-works"
-            className="text-zinc-600 hover:text-purple-600 transition"
+          </button>
+          <button
+            onClick={() => scrollToSection("how-it-works")}
+            className="text-zinc-600 hover:text-purple-600 transition cursor-pointer"
           >
             How it Works
-          </Link>
+          </button>
           <Link
             href="/login"
             className="text-purple-700 font-semibold hover:underline"
@@ -59,12 +77,12 @@ export default function Home() {
           >
             Get Started
           </Link>
-          <Link
-            href="#features"
-            className="text-purple-700 hover:underline text-base"
+          <button
+            onClick={() => scrollToSection("features")}
+            className="border border-purple-700 text-purple-700 hover:bg-purple-50 px-6 py-3 rounded-xl transition"
           >
             Learn More
-          </Link>
+          </button>
         </div>
       </section>
 
