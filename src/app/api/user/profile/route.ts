@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
-import { hashPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function PUT(req: NextRequest) {
@@ -16,7 +15,7 @@ export async function PUT(req: NextRequest) {
     }
 
     // Get user data from request body
-    const { firstName, lastName, email, password } = await req.json();
+    const { firstName, lastName, email } = await req.json();
 
     // Basic validation
     if (!firstName || !lastName || !email) {
@@ -31,7 +30,7 @@ export async function PUT(req: NextRequest) {
       where: {
         email: email,
         NOT: {
-          id: token.sub
+          id: token.sub,
         },
       },
     });
@@ -48,17 +47,11 @@ export async function PUT(req: NextRequest) {
       firstName: string;
       lastName: string;
       email: string;
-      password?: string;
     } = {
       firstName,
       lastName,
       email,
     };
-
-    // Only update password if provided
-    if (password && password.trim() !== '') {
-      updateData.password = await hashPassword(password);
-    }
 
     // Update the user in the database
     const updatedUser = await prisma.user.update({

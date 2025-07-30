@@ -12,11 +12,11 @@ export default function Dashboard() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [showCareerModal, setShowCareerModal] = useState(false);
-  
+
   // State for notifications
   const [notification, setNotification] = useState<{
     message: string;
-    type: 'success' | 'error';
+    type: "success" | "error";
   } | null>(null);
 
   // State for user data
@@ -32,9 +32,17 @@ export default function Dashboard() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
 
+  // Password states
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [confirmCurrentPassword, setConfirmCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+
+  // Password visibility states
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showConfirmCurrentPassword, setShowConfirmCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false); 
+  
   // Load profile data when session is available
   useEffect(() => {
     if (session?.user) {
@@ -120,51 +128,45 @@ export default function Dashboard() {
   // Handle profile update
   const updateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validation
     if (!firstName || !lastName || !email) {
       setNotification({
-        message: 'First name, last name, and email are required',
-        type: 'error'
+        message: "First name, last name, and email are required",
+        type: "error",
       });
       return;
     }
-    
-    // Password validation - check if both fields match
-    if (password && password !== confirmPassword) {
-      setNotification({
-        message: 'Passwords do not match',
-        type: 'error'
-      });
-      return;
-    }
-    
+
     try {
-      const response = await fetch('/api/user/profile', {
-        method: 'PUT',
+      const response = await fetch("/api/user/profile", {
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           firstName,
           lastName,
           email,
-          password: password || undefined // Only send password if it's not empty
         }),
       });
-      
+
       const data = await response.json();
-      
+
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to update profile');
+        throw new Error(data.message || "Failed to update profile");
       }
-      
-      // Close the modal
-      setShowProfileModal(false);
-      
-      // Reset password fields
-      setPassword('');
-      setConfirmPassword('');
+
+      // Show success notification
+      setNotification({
+        message: "Profile updated successfully",
+        type: "success",
+      });
+
+      // Auto-hide notification after 3 seconds
+      setTimeout(() => {
+        setNotification(null);
+      }, 3000);
       
       // Force a session refresh to update the UI with new user data
       await update({
@@ -173,26 +175,86 @@ export default function Dashboard() {
         lastName,
         email,
       });
+
+      // Close the modal
+      setShowProfileModal(false);
       
+      // Reload page to ensure all components update
+      window.location.reload();
+    } catch (error: unknown) {
+      console.error("Error updating profile:", error);
+      setNotification({
+        message:
+          error instanceof Error ? error.message : "Failed to update profile",
+        type: "error",
+      });
+    }
+  };
+
+  // Handle password change
+  const updatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validation
+    if (!currentPassword || !confirmCurrentPassword || !newPassword) {
+      setNotification({
+        message: "All password fields are required",
+        type: "error",
+      });
+      return;
+    }
+
+    // Check if current password fields match
+    if (currentPassword !== confirmCurrentPassword) {
+      setNotification({
+        message: "Current password fields do not match",
+        type: "error",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/user/password", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to update password");
+      }
+
+      // Close the modal
+      setShowProfileModal(false);
+
+      // Reset password fields
+      setCurrentPassword("");
+      setConfirmCurrentPassword("");
+      setNewPassword("");
+
       // Show success notification
       setNotification({
-        message: 'Profile updated successfully',
-        type: 'success'
+        message: "Password updated successfully",
+        type: "success",
       });
-      
+
       // Auto-hide notification after 3 seconds
       setTimeout(() => {
         setNotification(null);
       }, 3000);
-      
-      // Refresh the page to ensure all components update with new data
-      router.refresh();
-      
     } catch (error: unknown) {
-      console.error('Error updating profile:', error);
+      console.error("Error updating password:", error);
       setNotification({
-        message: error instanceof Error ? error.message : 'Failed to update profile',
-        type: 'error'
+        message:
+          error instanceof Error ? error.message : "Failed to update password",
+        type: "error",
       });
     }
   };
@@ -224,28 +286,46 @@ export default function Dashboard() {
     <main className="min-h-screen bg-purple-50 text-zinc-800 flex flex-col">
       {/* Notification */}
       {notification && (
-        <div 
+        <div
           className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg transition-all duration-300 ease-in-out ${
-            notification.type === 'success' 
-              ? 'bg-green-100 text-green-800 border-l-4 border-green-500' 
-              : 'bg-red-100 text-red-800 border-l-4 border-red-500'
+            notification.type === "success"
+              ? "bg-green-100 text-green-800 border-l-4 border-green-500"
+              : "bg-red-100 text-red-800 border-l-4 border-red-500"
           }`}
         >
           <div className="flex items-center">
-            {notification.type === 'success' ? (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            {notification.type === "success" ? (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 mr-2 text-green-500"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  clipRule="evenodd"
+                />
               </svg>
             ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 mr-2 text-red-500"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
               </svg>
             )}
             <p>{notification.message}</p>
           </div>
         </div>
       )}
-      
+
       {/* Top Navbar */}
       <nav className="px-6 py-4 bg-white border-b border-purple-100 flex justify-between items-center">
         <Link
@@ -452,7 +532,11 @@ export default function Dashboard() {
                 Edit Profile
               </h3>
 
-              <form onSubmit={updateProfile} className="space-y-4">
+              {/* Profile Information Form */}
+              <form onSubmit={updateProfile} className="space-y-4 mb-8">
+                <h4 className="text-lg font-semibold text-purple-700">
+                  Personal Information
+                </h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-zinc-700 mb-1">
@@ -490,31 +574,181 @@ export default function Dashboard() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">
-                    New Password (leave blank to keep current)
-                  </label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full border border-zinc-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">
-                    Confirm New Password
-                  </label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full border border-zinc-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-600"
-                  />
-                </div>
-
                 <div className="flex justify-end space-x-3 pt-2">
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-purple-700 text-white rounded-lg text-sm hover:bg-purple-800"
+                  >
+                    Save Profile
+                  </button>
+                </div>
+              </form>
+
+              {/* Password Change Form */}
+              <form
+                onSubmit={updatePassword}
+                className="space-y-4 pt-4 border-t border-zinc-200"
+              >
+                <h4 className="text-lg font-semibold text-purple-700">
+                  Change Password
+                </h4>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">
+                    Current Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showCurrentPassword ? "text" : "password"}
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className="w-full border border-zinc-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-600 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowCurrentPassword(!showCurrentPassword)
+                      }
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-500 hover:text-zinc-800"
+                    >
+                      {showCurrentPassword ? (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z"
+                            clipRule="evenodd"
+                          />
+                          <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
+                        </svg>
+                      ) : (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                          <path
+                            fillRule="evenodd"
+                            d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">
+                    Confirm Current Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmCurrentPassword ? "text" : "password"}
+                      value={confirmCurrentPassword}
+                      onChange={(e) =>
+                        setConfirmCurrentPassword(e.target.value)
+                      }
+                      className="w-full border border-zinc-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-600 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowConfirmCurrentPassword(
+                          !showConfirmCurrentPassword
+                        )
+                      }
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-500 hover:text-zinc-800"
+                    >
+                      {showConfirmCurrentPassword ? (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z"
+                            clipRule="evenodd"
+                          />
+                          <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
+                        </svg>
+                      ) : (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                          <path
+                            fillRule="evenodd"
+                            d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">
+                    New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full border border-zinc-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-600 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-500 hover:text-zinc-800"
+                    >
+                      {showNewPassword ? (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z"
+                            clipRule="evenodd"
+                          />
+                          <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
+                        </svg>
+                      ) : (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                          <path
+                            fillRule="evenodd"
+                            d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex justify-between space-x-3 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowProfileModal(false)}
@@ -526,7 +760,7 @@ export default function Dashboard() {
                     type="submit"
                     className="px-4 py-2 bg-purple-700 text-white rounded-lg text-sm hover:bg-purple-800"
                   >
-                    Save Changes
+                    Update Password
                   </button>
                 </div>
               </form>
