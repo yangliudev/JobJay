@@ -40,15 +40,40 @@ export default function Dashboard() {
 
   // Password visibility states
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showConfirmCurrentPassword, setShowConfirmCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false); 
-  
+  const [showConfirmCurrentPassword, setShowConfirmCurrentPassword] =
+    useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+
   // Load profile data when session is available
   useEffect(() => {
     if (session?.user) {
+      // First set from session for immediate display
       setFirstName(session.user.firstName || "");
       setLastName(session.user.lastName || "");
       setEmail(session.user.email || "");
+
+      // Fetch fresh user data from the database
+      const fetchUserData = async () => {
+        try {
+          const response = await fetch("/api/user/info");
+
+          if (!response.ok) {
+            throw new Error("Failed to fetch user data");
+          }
+
+          const data = await response.json();
+
+          // Update state with the latest user data from the database
+          setFirstName(data.user.firstName);
+          setLastName(data.user.lastName);
+          setEmail(data.user.email);
+        } catch (error) {
+          console.error("Error fetching user data:", error);
+        }
+      };
+
+      // Then fetch fresh data from the database
+      fetchUserData();
     }
   }, [session]);
 
@@ -167,7 +192,7 @@ export default function Dashboard() {
       setTimeout(() => {
         setNotification(null);
       }, 3000);
-      
+
       // Force a session refresh to update the UI with new user data
       await update({
         name: `${firstName} ${lastName}`,
@@ -178,9 +203,19 @@ export default function Dashboard() {
 
       // Close the modal
       setShowProfileModal(false);
-      
-      // Reload page to ensure all components update
-      window.location.reload();
+
+      // Fetch the latest data from the database
+      try {
+        const userResponse = await fetch("/api/user/info");
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          setFirstName(userData.user.firstName);
+          setLastName(userData.user.lastName);
+          setEmail(userData.user.email);
+        }
+      } catch (error) {
+        console.error("Error refreshing user data:", error);
+      }
     } catch (error: unknown) {
       console.error("Error updating profile:", error);
       setNotification({
@@ -368,7 +403,8 @@ export default function Dashboard() {
         <div className="w-full max-w-2xl text-center mb-10">
           <h1 className="text-2xl font-bold text-purple-800 mb-4">
             Welcome back,{" "}
-            {session?.user?.firstName ||
+            {firstName ||
+              session?.user?.firstName ||
               session?.user?.name?.split(" ")[0] ||
               "User"}{" "}
             👋
