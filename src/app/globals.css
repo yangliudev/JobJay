@@ -19,6 +19,106 @@
   }
 }
 
+/* Animation classes for celebrations */
+@keyframes confetti-1 {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+@keyframes confetti-2 {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(-720deg);
+    opacity: 0;
+  }
+}
+
+@keyframes confetti-3 {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(540deg);
+    opacity: 0;
+  }
+}
+
+@keyframes confetti-4 {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(-540deg);
+    opacity: 0;
+  }
+}
+
+@keyframes confetti-5 {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-slow {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.animate-confetti-1 {
+  animation: confetti-1 5s ease-in-out forwards;
+  font-size: 2rem;
+  opacity: 0;
+}
+
+.animate-confetti-2 {
+  animation: confetti-2 4.5s ease-in-out forwards;
+  font-size: 2rem;
+  opacity: 0;
+}
+
+.animate-confetti-3 {
+  animation: confetti-3 5.5s ease-in-out forwards;
+  font-size: 2rem;
+  opacity: 0;
+}
+
+.animate-confetti-4 {
+  animation: confetti-4 5s ease-in-out forwards;
+  font-size: 2rem;
+  opacity: 0;
+}
+
+.animate-confetti-5 {
+  animation: confetti-5 4.8s ease-in-out forwards;
+  font-size: 2rem;
+  opacity: 0;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

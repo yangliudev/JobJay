@@ -12,6 +12,7 @@ export default function Dashboard() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [showCareerModal, setShowCareerModal] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   // State for notifications
   const [notification, setNotification] = useState<{
@@ -46,6 +47,16 @@ export default function Dashboard() {
   const [showConfirmCurrentPassword, setShowConfirmCurrentPassword] =
     useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+
+  // Helper function to show notification and auto-dismiss it
+  const showNotification = (
+    message: string,
+    type: "success" | "error",
+    duration = 3000
+  ) => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), duration);
+  };
 
   // Get career-specific tips
   const getCareerTips = (careerField: string) => {
@@ -93,42 +104,18 @@ export default function Dashboard() {
         "🌟 Highlight unique perspectives and diverse experiences",
       ],
     };
+
+    // Use the requested career field tips or fall back to "Other" if not found
     return tips[careerField as keyof typeof tips] || tips["Other"];
   };
 
-  // Load profile data when session is available
+  // Load initial data
   useEffect(() => {
     if (session?.user) {
-      // First set from session for immediate display
+      // Set initial state from session for immediate UI update
       setFirstName(session.user.firstName || "");
       setLastName(session.user.lastName || "");
       setEmail(session.user.email || "");
-
-      // Fetch fresh user data from the database
-      const fetchUserData = async () => {
-        try {
-          const response = await fetch("/api/user/info");
-
-          if (!response.ok) {
-            throw new Error("Failed to fetch user data");
-          }
-
-          const data = await response.json();
-
-          // Update state with the latest user data from the database
-          setFirstName(data.user.firstName);
-          setLastName(data.user.lastName);
-          setEmail(data.user.email);
-          if (data.user.career) {
-            setCareer(data.user.career);
-          }
-        } catch (error) {
-          console.error("Error fetching user data:", error);
-        }
-      };
-
-      // Then fetch fresh data from the database
-      fetchUserData();
     }
   }, [session]);
 
@@ -139,81 +126,117 @@ export default function Dashboard() {
     setMounted(true);
   }, []);
 
-  // Fetch daily quote
+  // Fetch all user data in a single effect
   useEffect(() => {
     if (!mounted) return;
 
-    const fetchQuote = async () => {
+    const fetchAllData = async () => {
       try {
-        // Check if we already fetched a quote today
+        // Check if we need to reset daily applications (new day)
         const today = new Date().toDateString();
-        const storedDate = localStorage.getItem("quoteDate");
-        const storedQuote = localStorage.getItem("motivationalQuote");
+        const lastActiveDay = localStorage.getItem("lastActiveDay");
 
-        // Use cached quote if it's from today
-        if (storedDate === today && storedQuote) {
-          setQuote(JSON.parse(storedQuote));
-          return;
+        // If it's a new day, reset local application count
+        if (lastActiveDay && lastActiveDay !== today) {
+          localStorage.setItem("lastActiveDay", today);
+          setTodayApplications(0);
+          setGoalMet(false);
+
+          // Notify the backend about the new day
+          try {
+            await fetch("/api/applications/reset", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+            });
+          } catch (resetError) {
+            console.error("Error resetting daily applications:", resetError);
+          }
+        } else if (!lastActiveDay) {
+          // First time using the app, set today as last active day
+          localStorage.setItem("lastActiveDay", today);
         }
 
-        // Fetch a new quote with proxy to avoid CORS
-        const apiUrl =
-          "https://api.allorigins.win/get?url=https://zenquotes.io/api/quotes";
-        const response = await fetch(apiUrl);
+        // Fetch all data in parallel
+        const [userInfoResponse, userStatsResponse, quoteData] =
+          await Promise.all([
+            fetch("/api/user/info"),
+            fetch("/api/user/stats", {
+              cache: "no-store",
+              headers: { "Cache-Control": "no-cache" },
+            }),
+            (async () => {
+              // Check if we already have a quote for today
+              const storedDate = localStorage.getItem("quoteDate");
+              const storedQuote = localStorage.getItem("motivationalQuote");
 
-        if (!response.ok) {
-          throw new Error(`API responded with status: ${response.status}`);
-        }
+              // Use cached quote if it's from today
+              if (storedDate === today && storedQuote) {
+                return JSON.parse(storedQuote);
+              }
 
-        const result = await response.json();
-        const quotes = JSON.parse(result.contents); // because it's returned as a string
+              // Otherwise fetch a new quote
+              const apiUrl =
+                "https://api.allorigins.win/get?url=https://zenquotes.io/api/random";
+              const response = await fetch(apiUrl);
 
-        if (!quotes || !quotes.length || !quotes[0].q) {
-          throw new Error("Invalid quote data received");
-        }
+              if (!response.ok)
+                throw new Error(`Quote API error: ${response.status}`);
 
-        const newQuote = {
-          text: quotes[0].q,
-          author: quotes[0].a,
-        };
+              const result = await response.json();
+              const quotes = JSON.parse(result.contents);
 
-        setQuote(newQuote);
+              if (!quotes || !quotes.length || !quotes[0].q) {
+                throw new Error("Invalid quote data");
+              }
 
-        // Cache the quote in localStorage
-        localStorage.setItem("quoteDate", today);
-        localStorage.setItem("motivationalQuote", JSON.stringify(newQuote));
-      } catch (error) {
-        console.error("Failed to fetch quote:", error);
-        // Keep using the default quote or any quote already set
-        // No need to update localStorage cache if the API call failed
-      }
-    };
+              const newQuote = {
+                text: quotes[0].q,
+                author: quotes[0].a,
+              };
 
-    fetchQuote();
-  }, [mounted]);
+              // Cache the quote
+              localStorage.setItem("quoteDate", today);
+              localStorage.setItem(
+                "motivationalQuote",
+                JSON.stringify(newQuote)
+              );
 
-  // Fetch user stats
-  useEffect(() => {
-    if (!mounted) return;
+              return newQuote;
+            })(),
+          ]);
 
-    const fetchUserStats = async () => {
-      try {
-        const response = await fetch("/api/user/stats");
-        if (response.ok) {
-          const data = await response.json();
-          setDailyGoal(data.user.dailyGoal);
-          setCurrentStreak(data.user.currentStreak);
-          setLongestStreak(data.user.longestStreak);
-          setTodayApplications(data.todayApplications.count);
-          setGoalMet(data.todayApplications.goalMet);
-          if (data.user.career) {
-            setCareer(data.user.career);
+        // Process user info
+        if (userInfoResponse.ok) {
+          const userInfo = await userInfoResponse.json();
+          setFirstName(userInfo.user.firstName);
+          setLastName(userInfo.user.lastName);
+          setEmail(userInfo.user.email);
+          if (userInfo.user.career) {
+            setCareer(userInfo.user.career);
           }
         }
-      } catch (error) {
-        console.error("Error fetching user stats:", error);
 
-        // Use fallback from localStorage if API fails
+        // Process user stats
+        if (userStatsResponse.ok) {
+          const userStats = await userStatsResponse.json();
+          setDailyGoal(userStats.user.dailyGoal);
+          setCurrentStreak(userStats.user.currentStreak);
+          setLongestStreak(userStats.user.longestStreak);
+          setTodayApplications(userStats.todayApplications.count);
+          setGoalMet(userStats.todayApplications.goalMet);
+          if (userStats.user.career) {
+            setCareer(userStats.user.career);
+          }
+        }
+
+        // Set quote
+        if (quoteData) {
+          setQuote(quoteData);
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+
+        // Fallback to localStorage if API fails
         const savedCareer = localStorage.getItem("userCareer");
         if (savedCareer) setCareer(savedCareer);
 
@@ -222,110 +245,173 @@ export default function Dashboard() {
       }
     };
 
-    fetchUserStats();
-
-    // Fallback: Load career and goal from localStorage
-    const savedCareer = localStorage.getItem("userCareer");
-    if (savedCareer) setCareer(savedCareer);
-
-    const savedGoal = localStorage.getItem("dailyGoal");
-    if (savedGoal) setDailyGoal(parseInt(savedGoal, 10));
+    fetchAllData();
   }, [mounted]);
+
+  // Load user stats directly from backend - used for admin operations
+  const loadUserStatsFromBackend = async () => {
+    try {
+      const response = await fetch("/api/user/stats", { cache: "no-store" });
+
+      if (!response.ok) {
+        throw new Error(`Failed to refresh stats: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Update state with fresh data
+      setDailyGoal(data.user.dailyGoal);
+      setCurrentStreak(data.user.currentStreak);
+      setLongestStreak(data.user.longestStreak);
+      setTodayApplications(data.todayApplications.count);
+      setGoalMet(data.todayApplications.goalMet);
+      if (data.user.career) {
+        setCareer(data.user.career);
+      }
+    } catch (error) {
+      console.error("Error refreshing user stats:", error);
+    }
+  };
 
   // Handle marking applications as sent
   const markApplicationSent = async () => {
     try {
-      const response = await fetch("/api/applications", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      // Increment local count first
+      const newApplicationCount = todayApplications + 1;
+      setTodayApplications(newApplicationCount);
 
-      const data = await response.json();
+      // Check if this application meets the daily goal
+      const goalNowMet = newApplicationCount >= dailyGoal;
 
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to mark application");
-      }
-
-      // Update local state
-      setTodayApplications(data.dailyApplication.count);
-      setGoalMet(data.dailyApplication.goalMet);
-      setCurrentStreak(data.streak.current);
-      setLongestStreak(data.streak.longest);
-
-      // Show success notification
-      if (data.streak.updated && data.dailyApplication.goalMet) {
-        setNotification({
-          message: `🎉 Goal reached! Current streak: ${data.streak.current} days`,
-          type: "success",
+      // Only call API when the goal is met exactly to update the streak
+      if (newApplicationCount === dailyGoal) {
+        const response = await fetch("/api/applications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            count: newApplicationCount,
+            goalMet: true,
+          }),
         });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.message || "Failed to mark application");
+        }
+
+        const data = await response.json();
+
+        // Update streak information
+        setCurrentStreak(data.streak.current);
+        setLongestStreak(data.streak.longest);
+        setGoalMet(true);
+
+        // Show celebration for meeting the goal
+        setShowCelebration(true);
+        setTimeout(() => setShowCelebration(false), 5000);
+
+        showNotification(
+          `🎉 Congratulations! You've reached your daily goal of ${dailyGoal} applications! Current streak: ${data.streak.current} days`,
+          "success"
+        );
+      } else if (goalNowMet) {
+        // Already exceeded the goal
+        setGoalMet(true);
+        showNotification(
+          `You've exceeded your daily goal of ${dailyGoal} applications! Great work!`,
+          "success"
+        );
       } else {
-        setNotification({
-          message: "Application marked successfully!",
-          type: "success",
-        });
+        // Not yet met the goal
+        showNotification(
+          `Application marked! ${
+            dailyGoal - newApplicationCount
+          } more to reach your daily goal.`,
+          "success"
+        );
       }
-
-      // Auto-hide notification after 3 seconds
-      setTimeout(() => {
-        setNotification(null);
-      }, 3000);
     } catch (error) {
       console.error("Error marking application:", error);
-      setNotification({
-        message: "Failed to mark application",
-        type: "error",
-      });
+      // Revert the local count if there was an error
+      setTodayApplications(todayApplications);
+      showNotification("Failed to mark application", "error");
     }
   };
 
   // Handle undoing application
   const undoApplication = async () => {
+    // Don't allow undoing if goal is already met
+    if (goalMet) {
+      showNotification(
+        "Cannot undo applications after meeting your daily goal",
+        "error"
+      );
+      return;
+    }
+
     try {
-      const response = await fetch("/api/applications", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to undo application");
+      // First update local state for immediate feedback
+      if (todayApplications > 0) {
+        setTodayApplications(todayApplications - 1);
       }
 
-      // Update local state
-      setTodayApplications(data.dailyApplication.count);
-      setGoalMet(data.dailyApplication.goalMet);
-      setCurrentStreak(data.streak.current);
-      setLongestStreak(data.streak.longest);
+      // Only call the API if we're removing the last application before the goal
+      // This keeps the backend in sync with our local state
+      if (todayApplications === 1) {
+        const response = await fetch("/api/applications", {
+          method: "DELETE",
+        });
 
-      // Show success notification
-      setNotification({
-        message: "Application undone successfully",
-        type: "success",
-      });
+        if (!response.ok) {
+          const data = await response.json();
+          // Revert the local state change if API call fails
+          setTodayApplications(todayApplications);
+          throw new Error(data.message || "Failed to undo application");
+        }
 
-      // Auto-hide notification after 3 seconds
-      setTimeout(() => {
-        setNotification(null);
-      }, 3000);
+        // Load stats from backend to make sure everything is in sync
+        await loadUserStatsFromBackend();
+      }
+
+      showNotification("Application undone successfully", "success");
     } catch (error) {
       console.error("Error undoing application:", error);
-      setNotification({
-        message: "Failed to undo application",
-        type: "error",
-      });
+      showNotification("Failed to undo application", "error");
     }
   };
 
   // Handle saving daily goal
-  const saveGoal = (newGoal: number) => {
-    setDailyGoal(newGoal);
-    localStorage.setItem("dailyGoal", newGoal.toString());
-    setShowGoalModal(false);
+  const saveGoal = async (newGoal: number) => {
+    try {
+      // Update UI immediately for better UX
+      setDailyGoal(newGoal);
+      setShowGoalModal(false);
+
+      // Save to localStorage as backup
+      localStorage.setItem("dailyGoal", newGoal.toString());
+
+      // Save to server
+      const response = await fetch("/api/user/goal", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dailyGoal: newGoal }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save goal to server");
+      }
+
+      showNotification(
+        `Daily goal updated to ${newGoal} applications`,
+        "success"
+      );
+    } catch (error) {
+      console.error("Failed to save daily goal:", error);
+      showNotification(
+        "Failed to save your new goal. Please try again.",
+        "error"
+      );
+    }
   };
 
   // Handle saving career choice
@@ -334,12 +420,8 @@ export default function Dashboard() {
       // Save to database via API
       const response = await fetch("/api/user/career", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          career: newCareer,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ career: newCareer }),
       });
 
       if (!response.ok) {
@@ -351,22 +433,10 @@ export default function Dashboard() {
       localStorage.setItem("userCareer", newCareer);
       setShowCareerModal(false);
 
-      // Show success notification
-      setNotification({
-        message: `Career path set to ${newCareer}`,
-        type: "success",
-      });
-
-      // Auto-hide notification after 3 seconds
-      setTimeout(() => {
-        setNotification(null);
-      }, 3000);
+      showNotification(`Career path set to ${newCareer}`, "success");
     } catch (error) {
       console.error("Error saving career:", error);
-      setNotification({
-        message: "Failed to save career path",
-        type: "error",
-      });
+      showNotification("Failed to save career path", "error");
     }
   };
 
@@ -376,24 +446,18 @@ export default function Dashboard() {
 
     // Validation
     if (!firstName || !lastName || !email) {
-      setNotification({
-        message: "First name, last name, and email are required",
-        type: "error",
-      });
+      showNotification(
+        "First name, last name, and email are required",
+        "error"
+      );
       return;
     }
 
     try {
       const response = await fetch("/api/user/profile", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          firstName,
-          lastName,
-          email,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ firstName, lastName, email }),
       });
 
       const data = await response.json();
@@ -402,16 +466,7 @@ export default function Dashboard() {
         throw new Error(data.message || "Failed to update profile");
       }
 
-      // Show success notification
-      setNotification({
-        message: "Profile updated successfully",
-        type: "success",
-      });
-
-      // Auto-hide notification after 3 seconds
-      setTimeout(() => {
-        setNotification(null);
-      }, 3000);
+      showNotification("Profile updated successfully", "success");
 
       // Force a session refresh to update the UI with new user data
       await update({
@@ -438,11 +493,10 @@ export default function Dashboard() {
       }
     } catch (error: unknown) {
       console.error("Error updating profile:", error);
-      setNotification({
-        message:
-          error instanceof Error ? error.message : "Failed to update profile",
-        type: "error",
-      });
+      showNotification(
+        error instanceof Error ? error.message : "Failed to update profile",
+        "error"
+      );
     }
   };
 
@@ -452,32 +506,21 @@ export default function Dashboard() {
 
     // Validation
     if (!currentPassword || !confirmCurrentPassword || !newPassword) {
-      setNotification({
-        message: "All password fields are required",
-        type: "error",
-      });
+      showNotification("All password fields are required", "error");
       return;
     }
 
     // Check if current password fields match
     if (currentPassword !== confirmCurrentPassword) {
-      setNotification({
-        message: "Current password fields do not match",
-        type: "error",
-      });
+      showNotification("Current password fields do not match", "error");
       return;
     }
 
     try {
       const response = await fetch("/api/user/password", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          currentPassword,
-          newPassword,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
       });
 
       const data = await response.json();
@@ -494,23 +537,13 @@ export default function Dashboard() {
       setConfirmCurrentPassword("");
       setNewPassword("");
 
-      // Show success notification
-      setNotification({
-        message: "Password updated successfully",
-        type: "success",
-      });
-
-      // Auto-hide notification after 3 seconds
-      setTimeout(() => {
-        setNotification(null);
-      }, 3000);
+      showNotification("Password updated successfully", "success");
     } catch (error: unknown) {
       console.error("Error updating password:", error);
-      setNotification({
-        message:
-          error instanceof Error ? error.message : "Failed to update password",
-        type: "error",
-      });
+      showNotification(
+        error instanceof Error ? error.message : "Failed to update password",
+        "error"
+      );
     }
   };
 
@@ -529,10 +562,7 @@ export default function Dashboard() {
       router.push("/login");
     } catch (error) {
       console.error("Error signing out:", error);
-      setNotification({
-        message: "Failed to sign out. Please try again.",
-        type: "error",
-      });
+      showNotification("Failed to sign out. Please try again.", "error");
     }
   };
 
@@ -588,7 +618,42 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
+      {/* Streak Celebration */}
+      {showCelebration && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="w-full h-full absolute">
+            {/* Confetti effect */}
+            <div className="absolute top-0 left-1/4 animate-confetti-1">🎉</div>
+            <div className="absolute top-0 left-1/2 animate-confetti-2">🎊</div>
+            <div className="absolute top-0 right-1/4 animate-confetti-3">
+              🎯
+            </div>
+            <div className="absolute top-0 left-1/3 animate-confetti-4">🔥</div>
+            <div className="absolute top-0 right-1/3 animate-confetti-5">
+              ⭐
+            </div>
+            <div className="absolute top-0 left-2/3 animate-confetti-1">🏆</div>
+            <div className="absolute top-0 right-2/3 animate-confetti-2">
+              🎯
+            </div>
+          </div>
+          <div className="bg-white/90 px-8 py-6 rounded-xl shadow-lg text-center transform scale-110 animate-pulse-slow z-10">
+            <h3 className="text-2xl font-bold text-purple-800 mb-2">
+              Streak Updated! 🔥
+            </h3>
+            <p className="text-lg text-purple-700 mb-1">
+              You&apos;ve completed your daily goal!
+            </p>
+            <p className="text-3xl font-bold text-purple-900 mb-3">
+              {currentStreak} Day Streak! 🔥
+            </p>
+            <p className="text-sm text-purple-600">
+              Keep it up! You&apos;re making great progress on your job search
+              journey.
+            </p>
+          </div>
+        </div>
+      )}{" "}
       {/* Top Navbar */}
       <nav className="px-6 py-4 bg-white border-b border-purple-100 flex justify-between items-center">
         <Link
@@ -624,7 +689,6 @@ export default function Dashboard() {
           </button>
         </div>
       </nav>
-
       {/* Dashboard Content */}
       <div className="px-6 py-10 flex flex-col items-center flex-grow">
         {/* Header */}
@@ -651,19 +715,40 @@ export default function Dashboard() {
               today.
               {goalMet
                 ? " Great job meeting your goal! 🎉"
-                : " Keep the streak going! 🔥"}
+                : todayApplications > 0
+                ? ` ${
+                    dailyGoal - todayApplications
+                  } more to reach your daily goal!`
+                : " Start applying to keep your streak going! 🔥"}
             </p>
 
             {/* Streak Information */}
-            <div className="flex items-center justify-between bg-purple-50 rounded-lg p-3 mb-3">
+            <div
+              className={`flex items-center justify-between rounded-lg p-3 mb-3 ${
+                currentStreak > 0
+                  ? "bg-gradient-to-r from-purple-50 to-purple-100"
+                  : "bg-purple-50"
+              }`}
+            >
               <div className="flex items-center">
-                <span className="text-2xl mr-2">🔥</span>
+                <span
+                  className={`text-2xl mr-2 ${
+                    currentStreak > 0 ? "animate-pulse" : ""
+                  }`}
+                >
+                  🔥
+                </span>
                 <div>
                   <p className="text-sm font-medium text-purple-800">
-                    Current Streak: {currentStreak} days
+                    Current Streak:{" "}
+                    <span className="font-bold">{currentStreak}</span> days
+                    {currentStreak > 0 && " 🔥"}
                   </p>
                   <p className="text-xs text-purple-600">
                     Best: {longestStreak} days
+                    {currentStreak >= longestStreak &&
+                      longestStreak > 0 &&
+                      " (New record!)"}
                   </p>
                 </div>
               </div>
@@ -804,25 +889,43 @@ export default function Dashboard() {
                       (todayApplications / dailyGoal) * 100
                     )}%`,
                   }}
-                  className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-purple-600"
+                  className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${
+                    goalMet ? "bg-green-500" : "bg-purple-600"
+                  } ${goalMet ? "animate-pulse" : ""}`}
                 ></div>
               </div>
             </div>
 
             <p className="text-zinc-600 mb-4">
-              Applications remaining:{" "}
-              <strong>{Math.max(0, dailyGoal - todayApplications)}</strong> /{" "}
-              {dailyGoal}
+              {goalMet ? (
+                <span className="font-medium text-green-600">
+                  ✓ You&apos;ve completed your daily goal of {dailyGoal}{" "}
+                  applications!
+                </span>
+              ) : (
+                <>
+                  Applications remaining:{" "}
+                  <strong>{Math.max(0, dailyGoal - todayApplications)}</strong>{" "}
+                  / {dailyGoal}
+                </>
+              )}
             </p>
 
             <div className="flex space-x-2">
               <button
                 onClick={markApplicationSent}
-                className="flex-1 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-lg text-sm transition"
+                className={`flex-1 px-4 py-2 text-white rounded-lg text-sm transition ${
+                  goalMet
+                    ? "bg-green-600 hover:bg-green-700 cursor-default"
+                    : "bg-purple-700 hover:bg-purple-800"
+                }`}
+                disabled={goalMet}
               >
-                Mark 1 Application Sent
+                {goalMet
+                  ? "Daily Goal Completed! 🎉"
+                  : "Mark 1 Application Sent"}
               </button>
-              {todayApplications > 0 && (
+              {todayApplications > 0 && !goalMet && (
                 <button
                   onClick={undoApplication}
                   className="px-3 py-2 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 rounded-lg text-sm transition flex items-center"
