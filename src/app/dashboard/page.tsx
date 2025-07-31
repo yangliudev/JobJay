@@ -132,8 +132,17 @@ export default function Dashboard() {
     }
   }, [session]);
 
+  // Add mounted state to prevent hydration mismatch
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Fetch daily quote
   useEffect(() => {
+    if (!mounted) return;
+
     const fetchQuote = async () => {
       try {
         // Check if we already fetched a quote today
@@ -141,33 +150,52 @@ export default function Dashboard() {
         const storedDate = localStorage.getItem("quoteDate");
         const storedQuote = localStorage.getItem("motivationalQuote");
 
+        // Use cached quote if it's from today
         if (storedDate === today && storedQuote) {
           setQuote(JSON.parse(storedQuote));
           return;
         }
 
-        // Fetch a new quote
-        const response = await fetch(
-          "https://api.quotable.io/random?tags=inspirational,success"
-        );
-        const data = await response.json();
+        // Fetch a new quote with proxy to avoid CORS
+        const apiUrl =
+          "https://api.allorigins.win/get?url=https://zenquotes.io/api/quotes";
+        const response = await fetch(apiUrl);
+
+        if (!response.ok) {
+          throw new Error(`API responded with status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        const quotes = JSON.parse(result.contents); // because it's returned as a string
+
+        if (!quotes || !quotes.length || !quotes[0].q) {
+          throw new Error("Invalid quote data received");
+        }
 
         const newQuote = {
-          text: data.content,
-          author: data.author,
+          text: quotes[0].q,
+          author: quotes[0].a,
         };
 
         setQuote(newQuote);
+
+        // Cache the quote in localStorage
         localStorage.setItem("quoteDate", today);
         localStorage.setItem("motivationalQuote", JSON.stringify(newQuote));
       } catch (error) {
         console.error("Failed to fetch quote:", error);
+        // Keep using the default quote or any quote already set
+        // No need to update localStorage cache if the API call failed
       }
     };
 
     fetchQuote();
+  }, [mounted]);
 
-    // Fetch user stats from API
+  // Fetch user stats
+  useEffect(() => {
+    if (!mounted) return;
+
     const fetchUserStats = async () => {
       try {
         const response = await fetch("/api/user/stats");
@@ -184,18 +212,25 @@ export default function Dashboard() {
         }
       } catch (error) {
         console.error("Error fetching user stats:", error);
+
+        // Use fallback from localStorage if API fails
+        const savedCareer = localStorage.getItem("userCareer");
+        if (savedCareer) setCareer(savedCareer);
+
+        const savedGoal = localStorage.getItem("dailyGoal");
+        if (savedGoal) setDailyGoal(parseInt(savedGoal, 10));
       }
     };
 
     fetchUserStats();
 
-    // Load career and goal from localStorage as fallback
+    // Fallback: Load career and goal from localStorage
     const savedCareer = localStorage.getItem("userCareer");
     if (savedCareer) setCareer(savedCareer);
 
     const savedGoal = localStorage.getItem("dailyGoal");
     if (savedGoal) setDailyGoal(parseInt(savedGoal, 10));
-  }, []);
+  }, [mounted]);
 
   // Handle marking applications as sent
   const markApplicationSent = async () => {
@@ -481,16 +516,24 @@ export default function Dashboard() {
 
   // Handle sign out
   const handleSignOut = async () => {
-    // Clear any user-specific data from localStorage
-    localStorage.removeItem("dailyGoal");
-    localStorage.removeItem("userCareer");
-    localStorage.removeItem("quoteDate");
-    localStorage.removeItem("motivationalQuote");
-    localStorage.removeItem("todayApplications");
+    try {
+      // Clear any user-specific data from localStorage
+      localStorage.removeItem("dailyGoal");
+      localStorage.removeItem("userCareer");
+      localStorage.removeItem("quoteDate");
+      localStorage.removeItem("motivationalQuote");
+      localStorage.removeItem("todayApplications");
 
-    // Sign out via NextAuth
-    await signOut({ redirect: false });
-    router.push("/login");
+      // Sign out via NextAuth
+      await signOut({ redirect: false });
+      router.push("/login");
+    } catch (error) {
+      console.error("Error signing out:", error);
+      setNotification({
+        message: "Failed to sign out. Please try again.",
+        type: "error",
+      });
+    }
   };
 
   // Show loading state while session is loading
